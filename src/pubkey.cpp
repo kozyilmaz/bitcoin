@@ -171,7 +171,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context* ctx, secp256k1
     return 1;
 }
 
-/*bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchSig) const {
+bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchSig) const {
     if (!IsValid())
         return false;
     secp256k1_pubkey pubkey;
@@ -184,27 +184,6 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context* ctx, secp256k1
     }
     secp256k1_ecdsa_signature_normalize(secp256k1_context_verify, &sig, &sig);
     return secp256k1_ecdsa_verify(secp256k1_context_verify, &sig, hash.begin(), &pubkey);
-}*/
-
-bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchSig) const {
-    /*if (!IsValid())
-        return false;
-    secp256k1_pubkey pubkey;
-    secp256k1_ecdsa_signature sig;
-    if (!secp256k1_ec_pubkey_parse(secp256k1_context_verify, &pubkey, vch, size())) {
-        return false;
-    }
-    if (!ecdsa_signature_parse_der_lax(secp256k1_context_verify, &sig, vchSig.data(), vchSig.size())) {
-        return false;
-    }
-
-    secp256k1_ecdsa_signature_normalize(secp256k1_context_verify, &sig, &sig);
-    return secp256k1_ecdsa_verify(secp256k1_context_verify, &sig, hash.begin(), &pubkey);*/
-
-    OQS_STATUS status = OQS_ERROR;
-    status = OQS_SIG_verify(qTESLA_I_context_verify, hash.begin(), hash.size(), vchSig.data(), vchSig.size(), CKey::publicKey);
-
-    return true;
 }
 
 bool CPubKey::RecoverCompact(const uint256 &hash, const std::vector<unsigned char>& vchSig) {

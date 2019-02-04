@@ -15,7 +15,7 @@
 
 static secp256k1_context* secp256k1_context_sign = nullptr;
 
-uint8_t *CKey::publicKey = nullptr;
+//uint8_t *CKey::publicKey = public_key;
 
 /** These functions are taken from the libsecp256k1 distribution and are very ugly. */
 
@@ -170,7 +170,6 @@ bool CKey::Check(const unsigned char *vch) {
 }*/
 
 void CKey::MakeNewKey(bool fCompressedIn) {
-    CKey::publicKey = public_key;
     do {
         //GetStrongRandBytes(keydata.data(), keydata.size());
         OQS_randombytes(keydata.data(), keydata.size());
@@ -226,20 +225,21 @@ CPubKey CKey::GetPubKey() const {
     //int ret = secp256k1_ec_pubkey_create(secp256k1_context_sign, &pubkey, begin());
     //assert(ret);
     //secp256k1_ec_pubkey_serialize(secp256k1_context_sign, (unsigned char*)result.begin(), &clen, &pubkey, fCompressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
-    std::vector<unsigned char> vch(CKey::public_key, CKey::public_key + qTESLA_I_context_sign->length_public_key);
+    std::vector<unsigned char> vch(public_key, public_key + qTESLA_I_context_sign->length_public_key);
     result = CPubKey(vch);
     std::cout << "Result Size = " <<result.size() <<std::endl;
-    std::cout << "PubKey Size = " <<sizeof(CKey::publicKey)/sizeof(uint8_t) <<std::endl;
     assert(result.size() == clen);
     assert(result.IsValid());
 
     return result;
 }
 
-uint8_t CKey::GetPubKeyFromKeyPair() {
-    assert(publicKey);
-    return *publicKey;
-} 
+/*uint8_t CKey::GetPubKeyFromKeyPair() {
+    //CKey::publicKey(public_key);
+    //assert(publicKey);
+    //return *publicKey;
+    return nullptr;
+} */
 
 // Check that the sig has a low R value and will be less than 71 bytes
 bool SigHasLowR(const secp256k1_ecdsa_signature* sig)
@@ -301,7 +301,7 @@ bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool gr
     return status;
 }
 
-bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
+/*bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
     if (pubkey.IsCompressed() != fCompressed) {
         return false;
     }
@@ -312,7 +312,26 @@ bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
     CHash256().Write((unsigned char*)str.data(), str.size()).Write(rnd, sizeof(rnd)).Finalize(hash.begin());
     std::vector<unsigned char> vchSig;
     Sign(hash, vchSig);
+
     return pubkey.Verify(hash, vchSig);
+}*/
+
+bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
+    uint8_t *messageVerify = new uint8_t[MESSAGE_LEN];
+    size_t messageVerify_len = MESSAGE_LEN;
+
+    std::string str = "Bitcoin key verification\n";
+    OQS_randombytes(messageVerify, messageVerify_len);
+    uint256 hash;
+    CHash256().Write((unsigned char*)str.data(), str.size()).Write(messageVerify, messageVerify_len).Finalize(hash.begin());
+    std::vector<unsigned char> vchSig;
+    Sign(hash, vchSig, false, 0);
+
+    //Verify Signature.
+    OQS_STATUS status = OQS_ERROR;
+    status = OQS_SIG_verify(qTESLA_I_context_sign, hash.begin(), hash.size(), vchSig.data(), vchSig.size(), public_key);
+
+    return status;
 }
 
 bool CKey::SignCompact(const uint256 &hash, std::vector<unsigned char>& vchSig) const {

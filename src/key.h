@@ -72,7 +72,6 @@ public:
 
     //OQS
     uint8_t *public_key = new uint8_t[qTESLA_I_context_sign->length_public_key];
-    static uint8_t *publicKey;
     uint8_t *private_key = new uint8_t[qTESLA_I_context_sign->length_secret_key];
     OQS_STATUS rc, ret = OQS_ERROR;
 
@@ -80,7 +79,6 @@ public:
     //! Construct an invalid private key.
     CKey() : fValid(false), fCompressed(false)
     {
-        CKey::publicKey = new uint8_t[qTESLA_I_context_sign->length_public_key];
         OQS_SIG_keypair(qTESLA_I_context_sign, public_key, private_key);
         //std::cout << "Constructor: " << CKey::public_key << std::endl;
         // Important: vch must be 32 bytes in length to not break serialization
@@ -134,9 +132,6 @@ public:
      * This is expensive.
      */
     CPubKey GetPubKey() const;
-
-    // OQS
-    static uint8_t GetPubKeyFromKeyPair();
 
     /**
      * Create a DER-serialized signature.
