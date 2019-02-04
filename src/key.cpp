@@ -15,6 +15,8 @@
 
 static secp256k1_context* secp256k1_context_sign = nullptr;
 
+uint8_t *CKey::publicKey = nullptr;
+
 /** These functions are taken from the libsecp256k1 distribution and are very ugly. */
 
 /**
@@ -151,19 +153,33 @@ static int ec_privkey_export_der(const secp256k1_context *ctx, unsigned char *pr
     return 1;
 }
 
-bool CKey::Check(const unsigned char *vch) {
+/*bool CKey::Check(const unsigned char *vch) {
     return secp256k1_ec_seckey_verify(secp256k1_context_sign, vch);
+}*/
+
+bool CKey::Check(const unsigned char *vch) {
+    return true;
 }
 
-void CKey::MakeNewKey(bool fCompressedIn) {
+/*void CKey::MakeNewKey(bool fCompressedIn) {
     do {
         GetStrongRandBytes(keydata.data(), keydata.size());
     } while (!Check(keydata.data()));
     fValid = true;
     fCompressed = fCompressedIn;
+}*/
+
+void CKey::MakeNewKey(bool fCompressedIn) {
+    CKey::publicKey = public_key;
+    do {
+        //GetStrongRandBytes(keydata.data(), keydata.size());
+        OQS_randombytes(keydata.data(), keydata.size());
+    } while (!Check(keydata.data()));
+    fValid = true;
+    //fCompressed = fCompressedIn;
 }
 
-CPrivKey CKey::GetPrivKey() const {
+/*CPrivKey CKey::GetPrivKey() const {
     assert(fValid);
     CPrivKey privkey;
     int ret;
@@ -174,9 +190,22 @@ CPrivKey CKey::GetPrivKey() const {
     assert(ret);
     privkey.resize(privkeylen);
     return privkey;
+}*/
+
+CPrivKey CKey::GetPrivKey() const {
+    assert(fValid);
+    CPrivKey privkey;
+    int ret;
+    size_t privkeylen;
+    privkey.resize(PRIVATE_KEY_SIZE);
+    privkeylen = PRIVATE_KEY_SIZE;
+    privkey = CPrivKey(private_key, private_key + qTESLA_I_context_sign->length_secret_key);
+    //assert(ret);
+    privkey.resize(privkeylen);
+    return privkey;
 }
 
-CPubKey CKey::GetPubKey() const {
+/*CPubKey CKey::GetPubKey() const {
     assert(fValid);
     secp256k1_pubkey pubkey;
     size_t clen = CPubKey::PUBLIC_KEY_SIZE;
@@ -187,7 +216,30 @@ CPubKey CKey::GetPubKey() const {
     assert(result.size() == clen);
     assert(result.IsValid());
     return result;
+}*/
+
+CPubKey CKey::GetPubKey() const {
+    assert(fValid);
+
+    size_t clen = CPubKey::PUBLIC_KEY_SIZE;
+    CPubKey result;
+    //int ret = secp256k1_ec_pubkey_create(secp256k1_context_sign, &pubkey, begin());
+    //assert(ret);
+    //secp256k1_ec_pubkey_serialize(secp256k1_context_sign, (unsigned char*)result.begin(), &clen, &pubkey, fCompressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
+    std::vector<unsigned char> vch(CKey::public_key, CKey::public_key + qTESLA_I_context_sign->length_public_key);
+    result = CPubKey(vch);
+    std::cout << "Result Size = " <<result.size() <<std::endl;
+    std::cout << "PubKey Size = " <<sizeof(CKey::publicKey)/sizeof(uint8_t) <<std::endl;
+    assert(result.size() == clen);
+    assert(result.IsValid());
+
+    return result;
 }
+
+uint8_t CKey::GetPubKeyFromKeyPair() {
+    assert(publicKey);
+    return *publicKey;
+} 
 
 // Check that the sig has a low R value and will be less than 71 bytes
 bool SigHasLowR(const secp256k1_ecdsa_signature* sig)
@@ -202,7 +254,7 @@ bool SigHasLowR(const secp256k1_ecdsa_signature* sig)
     return compact_sig[0] < 0x80;
 }
 
-bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool grind, uint32_t test_case) const {
+/*bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool grind, uint32_t test_case) const {
     if (!fValid)
         return false;
     vchSig.resize(CPubKey::SIGNATURE_SIZE);
@@ -222,6 +274,31 @@ bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool gr
     secp256k1_ecdsa_signature_serialize_der(secp256k1_context_sign, vchSig.data(), &nSigLen, &sig);
     vchSig.resize(nSigLen);
     return true;
+}*/
+
+bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool grind, uint32_t test_case) const {
+    if (!fValid)
+        return false;
+    vchSig.resize(CPubKey::SIGNATURE_SIZE);
+    size_t nSigLen = CPubKey::SIGNATURE_SIZE;
+    unsigned char extra_entropy[32] = {0};
+    WriteLE32(extra_entropy, test_case);
+    secp256k1_ecdsa_signature sig;
+    uint32_t counter = 0;
+    int ret = secp256k1_ecdsa_sign(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, (!grind && test_case) ? extra_entropy : nullptr);
+
+    // Grind for low R
+    /*while (ret && !SigHasLowR(&sig) && grind) {
+        WriteLE32(extra_entropy, ++counter);
+        ret = secp256k1_ecdsa_sign(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, extra_entropy);
+    }*/
+    vchSig.resize(nSigLen);
+    vchSig = std::vector<unsigned char>(signature, signature + signature_len);
+    OQS_STATUS status = OQS_ERROR;
+
+    status = OQS_SIG_sign(qTESLA_I_context_sign, vchSig.data(), &nSigLen, hash.begin(), hash.size(), private_key);
+
+    return status;
 }
 
 bool CKey::VerifyPubKey(const CPubKey& pubkey) const {

@@ -14,6 +14,11 @@
 #include <stdexcept>
 #include <vector>
 
+extern "C" {
+	// Liboqs
+	#include <oqs/oqs.h>
+}
+
 const unsigned int BIP32_EXTKEY_SIZE = 74;
 
 /** A reference to a CKey: the Hash160 of its serialized public key */
@@ -33,9 +38,9 @@ public:
     /**
      * secp256k1:
      */
-    static constexpr unsigned int PUBLIC_KEY_SIZE             = 65;
+    static constexpr unsigned int PUBLIC_KEY_SIZE             = 1504; //OQS
     static constexpr unsigned int COMPRESSED_PUBLIC_KEY_SIZE  = 33;
-    static constexpr unsigned int SIGNATURE_SIZE              = 72;
+    static constexpr unsigned int SIGNATURE_SIZE              = 1376; //OQS
     static constexpr unsigned int COMPACT_SIGNATURE_SIZE      = 65;
     /**
      * see www.keylength.com

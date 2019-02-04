@@ -14,7 +14,14 @@
 
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
+extern "C" {
+	// Liboqs
+	#include <oqs/oqs.h>
+}
+
+#define MESSAGE_LEN 50
 
 /**
  * secure_allocator is defined in allocators.h
@@ -23,6 +30,9 @@
  */
 typedef std::vector<unsigned char, secure_allocator<unsigned char> > CPrivKey;
 
+// OQS
+static OQS_SIG *qTESLA_I_context_sign = OQS_SIG_new(OQS_SIG_alg_default);
+
 /** An encapsulated private key. */
 class CKey
 {
@@ -30,7 +40,7 @@ public:
     /**
      * secp256k1:
      */
-    static const unsigned int PRIVATE_KEY_SIZE            = 279;
+    static const unsigned int PRIVATE_KEY_SIZE            = 2112;//OQS
     static const unsigned int COMPRESSED_PRIVATE_KEY_SIZE = 214;
     /**
      * see www.keylength.com
@@ -55,11 +65,26 @@ private:
     bool static Check(const unsigned char* vch);
 
 public:
+    uint8_t *message = new uint8_t[MESSAGE_LEN];
+    size_t message_len = MESSAGE_LEN;
+    uint8_t *signature = new uint8_t(qTESLA_I_context_sign->length_signature);
+    size_t signature_len;
+
+    //OQS
+    uint8_t *public_key = new uint8_t[qTESLA_I_context_sign->length_public_key];
+    static uint8_t *publicKey;
+    uint8_t *private_key = new uint8_t[qTESLA_I_context_sign->length_secret_key];
+    OQS_STATUS rc, ret = OQS_ERROR;
+
+public:
     //! Construct an invalid private key.
     CKey() : fValid(false), fCompressed(false)
     {
+        CKey::publicKey = new uint8_t[qTESLA_I_context_sign->length_public_key];
+        OQS_SIG_keypair(qTESLA_I_context_sign, public_key, private_key);
+        //std::cout << "Constructor: " << CKey::public_key << std::endl;
         // Important: vch must be 32 bytes in length to not break serialization
-        keydata.resize(32);
+        keydata.resize(32);  
     }
 
     friend bool operator==(const CKey& a, const CKey& b)
@@ -83,7 +108,7 @@ public:
             fValid = false;
         }
     }
-
+    
     //! Simple read-only vector-like interface.
     unsigned int size() const { return (fValid ? keydata.size() : 0); }
     const unsigned char* begin() const { return keydata.data(); }
@@ -109,6 +134,9 @@ public:
      * This is expensive.
      */
     CPubKey GetPubKey() const;
+
+    // OQS
+    static uint8_t GetPubKeyFromKeyPair();
 
     /**
      * Create a DER-serialized signature.

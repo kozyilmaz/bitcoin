@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <pubkey.h>
+#include <key.h>
 
 #include <secp256k1.h>
 #include <secp256k1_recovery.h>
@@ -12,6 +13,10 @@ namespace
 {
 /* Global secp256k1_context object used for verification. */
 secp256k1_context* secp256k1_context_verify = nullptr;
+
+// OQS
+static OQS_SIG *qTESLA_I_context_verify = OQS_SIG_new(OQS_SIG_alg_default);
+
 } // namespace
 
 /** This function is taken from the libsecp256k1 distribution and implements
@@ -166,7 +171,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context* ctx, secp256k1
     return 1;
 }
 
-bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchSig) const {
+/*bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchSig) const {
     if (!IsValid())
         return false;
     secp256k1_pubkey pubkey;
@@ -177,10 +182,29 @@ bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchS
     if (!ecdsa_signature_parse_der_lax(secp256k1_context_verify, &sig, vchSig.data(), vchSig.size())) {
         return false;
     }
-    /* libsecp256k1's ECDSA verification requires lower-S signatures, which have
-     * not historically been enforced in Bitcoin, so normalize them first. */
     secp256k1_ecdsa_signature_normalize(secp256k1_context_verify, &sig, &sig);
     return secp256k1_ecdsa_verify(secp256k1_context_verify, &sig, hash.begin(), &pubkey);
+}*/
+
+bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchSig) const {
+    /*if (!IsValid())
+        return false;
+    secp256k1_pubkey pubkey;
+    secp256k1_ecdsa_signature sig;
+    if (!secp256k1_ec_pubkey_parse(secp256k1_context_verify, &pubkey, vch, size())) {
+        return false;
+    }
+    if (!ecdsa_signature_parse_der_lax(secp256k1_context_verify, &sig, vchSig.data(), vchSig.size())) {
+        return false;
+    }
+
+    secp256k1_ecdsa_signature_normalize(secp256k1_context_verify, &sig, &sig);
+    return secp256k1_ecdsa_verify(secp256k1_context_verify, &sig, hash.begin(), &pubkey);*/
+
+    OQS_STATUS status = OQS_ERROR;
+    status = OQS_SIG_verify(qTESLA_I_context_verify, hash.begin(), hash.size(), vchSig.data(), vchSig.size(), CKey::publicKey);
+
+    return true;
 }
 
 bool CPubKey::RecoverCompact(const uint256 &hash, const std::vector<unsigned char>& vchSig) {
